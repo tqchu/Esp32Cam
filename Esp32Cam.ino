@@ -3,8 +3,8 @@
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 #include "camera_pins.h"
 
-const char* ssid = "T490";
-const char* password = "12112002";
+const char* ssid = "Nham_Caphe49";
+const char* password = "79797979";
 String serverName = "192.168.171.130";
 String serverPath = "/upload";  // The default serverPath should be upload.php
 
