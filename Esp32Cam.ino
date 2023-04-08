@@ -3,9 +3,9 @@
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 #include "camera_pins.h"
 
-const char* ssid = "Nham_Caphe49";
-const char* password = "79797979";
-String serverName = "192.168.171.130";
+const char* ssid = "T490";
+const char* password = "12112002";
+String serverName = "192.168.113.130";
 String serverPath = "/upload";  // The default serverPath should be upload.php
 
 const int serverPort = 8000;
@@ -120,7 +120,7 @@ void loop() {
   delay(10000);
 }
 
-String sendPhoto() {
+String  sendPhoto() {
   WiFiClient client;
 
   camera_fb_t* fb = NULL;
@@ -177,7 +177,9 @@ String sendPhoto() {
     client.stop();
     return body;
   } else {
+    esp_camera_fb_return(fb);
     String getBody = "Connection to " + serverName + " failed.";
-    Serial.println(getBody);
+    return getBody;
+    
   }
 }
