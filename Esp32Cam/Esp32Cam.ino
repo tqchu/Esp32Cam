@@ -1,22 +1,33 @@
 #include "esp_camera.h"
+#include <Arduino.h>
 #include <WiFi.h>
-#define CAMERA_MODEL_AI_THINKER // Has PSRAM
+#define CAMERA_MODEL_AI_THINKER  // Has PSRAM
 #include "camera_pins.h"
+#include <WebSocketsServer.h>
+#include "ServerToCam.h"
 
-const char* ssid = "T490";
-const char* password = "12112002";
-String serverName = "192.168.113.130";
+unsigned long time_now = 0;
+
+const char* ssid = "Choco";
+const char* password = "88888888";
+String serverName = "192.168.69.130";
 String serverPath = "/upload";  // The default serverPath should be upload.php
 
 const int serverPort = 8000;
+
 void startCameraServer();
 void setupLedFlash(int pin);
 WiFiClient client;
+
 void setup() {
+  Serial.print("Server : ");
+  Serial.println(serverName);
+  // set với arduino baudrate 115200
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
 
+  // Khởi tạo WebSocket server
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -38,16 +49,16 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_UXGA;
-  config.pixel_format = PIXFORMAT_JPEG; // for streaming
+  config.pixel_format = PIXFORMAT_JPEG;  // for streaming
   config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
   config.fb_count = 1;
-  
+
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
   //                      for larger pre-allocated frame buffer.
-  if(config.pixel_format == PIXFORMAT_JPEG){
-    if(psramFound()){
+  if (config.pixel_format == PIXFORMAT_JPEG) {
+    if (psramFound()) {
       config.jpeg_quality = 10;
       config.fb_count = 2;
       config.grab_mode = CAMERA_GRAB_LATEST;
@@ -71,15 +82,15 @@ void setup() {
     return;
   }
 
-  sensor_t * s = esp_camera_sensor_get();
+  sensor_t* s = esp_camera_sensor_get();
   // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID) {
-    s->set_vflip(s, 1); // flip it back
-    s->set_brightness(s, 1); // up the brightness just a bit
-    s->set_saturation(s, -2); // lower the saturation
+    s->set_vflip(s, 1);        // flip it back
+    s->set_brightness(s, 1);   // up the brightness just a bit
+    s->set_saturation(s, -2);  // lower the saturation
   }
   // drop down frame size for higher initial frame rate
-  if(config.pixel_format == PIXFORMAT_JPEG){
+  if (config.pixel_format == PIXFORMAT_JPEG) {
     s->set_framesize(s, FRAMESIZE_SVGA);
   }
 
@@ -103,24 +114,71 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+
   }
   Serial.println("");
   Serial.println("WiFi connected");
 
   startCameraServer();
+  // Serial.println(sendIP());
+  Serial.println("Camera Ready! Use 'http://");
+  Serial.println(WiFi.localIP());
 
+  IPAddress ipAddress = WiFi.localIP();
+  serverName = String(ipAddress[0]) + String(".") + String(ipAddress[1]) + String(".") + String(ipAddress[2]) + String(".130");
+
+  Serial.print("' to connect server ---  ");
+  Serial.println(serverName);
+}
+
+void initWifi(){
+  WiFi.begin(ssid, password);
+  WiFi.setSleep(false);
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+
+  startCameraServer();
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+
+  IPAddress ipAddress = WiFi.localIP();
+  serverName = String(ipAddress[0]) + String(".") + String(ipAddress[1]) + String(".") + String(ipAddress[2]) + String(".130");
+
+  Serial.print("' to connect server ---  ");
+  Serial.println(serverName);
 }
+
+// int restart = 12;
+void restart(){
+  int value = digitalRead(12);
+  if (value == HIGH) {
+    delay(500);
+    ESP.restart();
+  }
+  
+}
+int period = 8000;
 
 void loop() {
-  // Do nothing. Everything is done in another task by the web server
-  Serial.println(sendPhoto());
-  delay(10000);
+  
+  if (WiFi.status() != WL_CONNECTED){
+    delay(1000);
+    // ESP.restart();
+    initWifi();
+  }
+  // Serial.println("wifi-connected");
+
+  // Serial.println(sendPhoto());
+  Serial.println(30);
+  delay(12000);
+  
 }
 
-String  sendPhoto() {
+String sendPhoto() {
   WiFiClient client;
 
   camera_fb_t* fb = NULL;
@@ -131,10 +189,10 @@ String  sendPhoto() {
     ESP.restart();
   }
 
-  Serial.println("Connecting to server: " + serverName);
+  //Serial.println("Connecting to server: " + serverName);
 
   if (client.connect(serverName.c_str(), serverPort)) {
-    Serial.println("Connection successful!");
+    Serial.println("connect-server");
     String head = "--RandomNerdTutorials\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32-cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
     String tail = "\r\n--RandomNerdTutorials--\r\n";
 
@@ -164,6 +222,7 @@ String  sendPhoto() {
 
     esp_camera_fb_return(fb);
     String response = "";
+
     while (client.connected()) {
       String line = client.readStringUntil('\n');
       if (line == "\r") {
@@ -173,13 +232,15 @@ String  sendPhoto() {
     }
 
     String body = client.readString();
-
     client.stop();
+    Serial.println("send_success");
     return body;
+
   } else {
+    // getResultFromServer();
+    String getBody = "send_fail";
+    // Serial.println("30");
     esp_camera_fb_return(fb);
-    String getBody = "Connection to " + serverName + " failed.";
     return getBody;
-    
   }
 }
