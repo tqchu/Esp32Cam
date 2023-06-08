@@ -4,28 +4,22 @@
 #define CAMERA_MODEL_AI_THINKER  // Has PSRAM
 #include "camera_pins.h"
 #include <WebSocketsServer.h>
-#include "ServerToCam.h"
-
-unsigned long time_now = 0;
 
 const char* ssid = "Choco";
 const char* password = "88888888";
+
 String serverName = "192.168.69.130";
 String serverPath = "/upload";  // The default serverPath should be upload.php
+// WebSocketsServer webSocket = WebSocketsServer(81);
 
 const int serverPort = 8000;
-
 void startCameraServer();
 void setupLedFlash(int pin);
+
 WiFiClient client;
 
 void setup() {
-  Serial.print("Server : ");
-  Serial.println(serverName);
-  // set với arduino baudrate 115200
   Serial.begin(115200);
-  Serial.setDebugOutput(true);
-  Serial.println();
 
   // Khởi tạo WebSocket server
   camera_config_t config;
@@ -78,7 +72,7 @@ void setup() {
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
+    // Serial.printf("Camera init failed with error 0x%x", err);
     return;
   }
 
@@ -107,75 +101,31 @@ void setup() {
 #if defined(LED_GPIO_NUM)
   setupLedFlash(LED_GPIO_NUM);
 #endif
+  initWifi();  
+}
 
+void initWifi() {
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
-
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
 
   startCameraServer();
-  // Serial.println(sendIP());
-  Serial.println("Camera Ready! Use 'http://");
-  Serial.println(WiFi.localIP());
 
   IPAddress ipAddress = WiFi.localIP();
   serverName = String(ipAddress[0]) + String(".") + String(ipAddress[1]) + String(".") + String(ipAddress[2]) + String(".130");
 
-  Serial.print("' to connect server ---  ");
-  Serial.println(serverName);
 }
 
-void initWifi(){
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-  
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-
-  startCameraServer();
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-
-  IPAddress ipAddress = WiFi.localIP();
-  serverName = String(ipAddress[0]) + String(".") + String(ipAddress[1]) + String(".") + String(ipAddress[2]) + String(".130");
-
-  Serial.print("' to connect server ---  ");
-  Serial.println(serverName);
-}
-
-// int restart = 12;
-void restart(){
-  int value = digitalRead(12);
-  if (value == HIGH) {
-    delay(500);
-    ESP.restart();
-  }
-  
-}
-int period = 8000;
 
 void loop() {
-  
   if (WiFi.status() != WL_CONNECTED){
-    delay(1000);
-    // ESP.restart();
     initWifi();
   }
-  // Serial.println("wifi-connected");
-
-  // Serial.println(sendPhoto());
-  Serial.println(30);
-  delay(12000);
-  
+  Serial.println(sendPhoto());
+  delay(13000);
 }
 
 String sendPhoto() {
@@ -184,15 +134,11 @@ String sendPhoto() {
   camera_fb_t* fb = NULL;
   fb = esp_camera_fb_get();
   if (!fb) {
-    Serial.println("Camera capture failed");
     delay(1000);
     ESP.restart();
   }
 
-  //Serial.println("Connecting to server: " + serverName);
-
   if (client.connect(serverName.c_str(), serverPort)) {
-    Serial.println("connect-server");
     String head = "--RandomNerdTutorials\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32-cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
     String tail = "\r\n--RandomNerdTutorials--\r\n";
 
@@ -233,14 +179,13 @@ String sendPhoto() {
 
     String body = client.readString();
     client.stop();
-    Serial.println("send_success");
     return body;
 
   } else {
-    // getResultFromServer();
-    String getBody = "send_fail";
-    // Serial.println("30");
+
+    String getBody = "Connection_failed!";
     esp_camera_fb_return(fb);
     return getBody;
+    
   }
 }
